@@ -1,5 +1,6 @@
 #include <genesis.h>
 
+#include "gfx.h"
 #include "sprite.h"
 
 #define MAX_SPEED       FIX32(8)
@@ -22,6 +23,7 @@ static void handleInput();
 static void joyEvent(u16 joy, u16 changed, u16 state);
 
 static void updatePhysic();
+static void updateCamera(u16 x);
 
 // sprites structure (pointer of Sprite)
 Sprite* sprites[1+MAX_BULLET+MAX_ENEMY];
@@ -43,8 +45,9 @@ s16 enemyXorder[2];
 int main()
 {
     u16 palette[64];
-    //u16 ind;
+    u16 ind;
 	u16 i;
+	u16 counter;
 
     // disable interrupt when accessing VDP
     SYS_disableInts();
@@ -59,13 +62,13 @@ int main()
     VDP_setPaletteColors(0, (u16*) palette_black, 64);
 
     // load background
-	/*
+	
     ind = TILE_USERINDEX;
-    VDP_drawImageEx(PLAN_B, &bgb_image, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE, ind), 0, 0, FALSE, TRUE);
-    ind += bgb_image.tileset->numTile;
-    VDP_drawImageEx(PLAN_A, &bga_image, TILE_ATTR_FULL(PAL1, FALSE, FALSE, FALSE, ind), 0, 0, FALSE, TRUE);
-    ind += bga_image.tileset->numTile;
-	*/
+    VDP_drawImageEx(PLAN_B, &plan_b, TILE_ATTR_FULL(PAL1, FALSE, FALSE, FALSE, ind), 0, 0, FALSE, TRUE);
+    ind += plan_b.tileset->numTile;
+    VDP_drawImageEx(PLAN_A, &plan_a, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE, ind), 0, 0, FALSE, TRUE);
+    ind += plan_a.tileset->numTile;
+	
 
     // VDP process done, we can re enable interrupts
     SYS_enableInts();
@@ -78,15 +81,17 @@ int main()
     movy = FIX32(0);
     xorder = 0;
     yorder = 0;
+	counter = 0;
 
 
     // init scrolling
+	updateCamera(counter);
 	
 	// init bullet
 	for(i = 0; i < MAX_BULLET; i++)
 	{
 		bullet_ls[2][i] = 0;
-		sprites[1+i] = SPR_addSprite(&bullet, fix32ToInt(posx), fix32ToInt(posy), TILE_ATTR(PAL1, TRUE, FALSE, FALSE));
+		sprites[1+i] = SPR_addSprite(&bullet, fix32ToInt(posx), fix32ToInt(posy), TILE_ATTR(PAL3, TRUE, FALSE, FALSE));
 		SPR_setVisibility(sprites[i+1],HIDDEN);
 	}
 
@@ -96,10 +101,11 @@ int main()
     SPR_update();
 
     // prepare palettes
-    //memcpy(&palette[0], bgb_image.palette->data, 16 * 2);
-    memcpy(&palette[16], bullet.palette->data, 16 * 2);
+    memcpy(&palette[0], plan_a.palette->data, 16 * 2);
+    memcpy(&palette[16], plan_b.palette->data, 16 * 2);
 
     memcpy(&palette[32], labo_ship.palette->data, 16 * 2);
+	memcpy(&palette[48], bullet.palette->data, 16 * 2);
 
     // fade in
     VDP_fadeIn(0, (4 * 16) - 1, palette, 20, FALSE);
@@ -108,12 +114,15 @@ int main()
 
     while(TRUE)
     {
+		counter += 1;
         handleInput();
 
         updatePhysic();
 
         // update sprites
         SPR_update();
+		
+		updateCamera(counter);
 
         VDP_waitVSync();
     }
@@ -214,6 +223,14 @@ static void updatePhysic()
     // set sprites position
     SPR_setPosition(sprites[0], fix32ToInt(posx), fix32ToInt(posy));
 
+}
+
+static void updateCamera(u16 x)
+{
+    VDP_setHorizontalScroll(PLAN_A, -x);
+    VDP_setHorizontalScroll(PLAN_B, -x >> 3);
+	VDP_setVerticalScroll(PLAN_A, 0);
+    VDP_setVerticalScroll(PLAN_B, 0);
 }
 
 static void handleInput()
